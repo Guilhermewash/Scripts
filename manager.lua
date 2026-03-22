@@ -12,7 +12,7 @@ end
 local actualVersion = 1
 local storageDir = "/KAIZEN/ScriptsT"
 local storageFile = storageDir .. "/" .. (player and player:getName() or "global") .. ".json"
-local scriptListUrl = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/script_list.lua"
+local scriptListUrl = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/main/script_list.lua"
 
 local function ensureStorage()
   if not g_resources.directoryExists(storageDir) then

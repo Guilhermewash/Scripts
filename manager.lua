@@ -12,7 +12,7 @@ end
 local actualVersion = 1
 local storageDir = "/KAIZEN/ScriptsT"
 local storageFile = storageDir .. "/" .. (player and player:getName() or "global") .. ".json"
-local scriptListUrl = "https://raw.githubusercontent.com/Guilhermewash/Scripts/main/script_list.lua"
+local scriptListUrl = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/script_list.lua"
 
 local function ensureStorage()
   if not g_resources.directoryExists(storageDir) then
@@ -89,11 +89,16 @@ local function getDownloadPath(fileInfo)
   return "/Scripts/downloads/" .. localName
 end
 
+local function getRemotePath(fileInfo)
+  return fileInfo.path or fileInfo.url or ""
+end
+
 local function importEntryOtuis(entry)
   for _, fileInfo in ipairs(getEntryFiles(entry)) do
     local localPath = getDownloadPath(fileInfo)
     local fileType = (fileInfo.type or localPath:match("%.([^.]+)$") or ""):lower()
     if (fileType == "otui" or fileType == "ui") and g_resources.fileExists(localPath) then
+      warn("Scripts T: importando UI " .. localPath)
       g_ui.importStyle(localPath)
     end
   end
@@ -104,6 +109,7 @@ local function loadEntryLua(entry)
     local localPath = getDownloadPath(fileInfo)
     local fileType = (fileInfo.type or localPath:match("%.([^.]+)$") or ""):lower()
     if fileType == "lua" and g_resources.fileExists(localPath) then
+      warn("Scripts T: carregando script " .. localPath)
       local script = g_resources.readFileContents(localPath)
       if script and script ~= "" then
         assert(loadstring(script, "@" .. localPath))()
@@ -114,19 +120,21 @@ end
 
 local function downloadEntryFiles(entry, callback)
   local files = getEntryFiles(entry)
-  local total = #files
   local index = 1
+
+  warn("Scripts T: iniciando download de " .. entry.name .. " (" .. #files .. " arquivo(s))")
 
   local function nextFile()
     local fileInfo = files[index]
     if not fileInfo then
+      warn("Scripts T: download concluido de " .. entry.name)
       if callback then
         callback(true)
       end
       return
     end
 
-    local remotePath = fileInfo.path or fileInfo.url
+    local remotePath = getRemotePath(fileInfo)
     if not remotePath or remotePath == "" then
       if callback then
         callback(false, "arquivo remoto vazio")
@@ -134,15 +142,20 @@ local function downloadEntryFiles(entry, callback)
       return
     end
 
+    warn("Scripts T: baixando [" .. index .. "/" .. #files .. "] " .. remotePath)
+
     modules.corelib.HTTP.get(remotePath, function(content, err)
       if err or not content or content == "" then
+        warn("Scripts T: falha em [" .. index .. "/" .. #files .. "] " .. remotePath)
         if callback then
           callback(false, err or "resposta vazia")
         end
         return
       end
 
-      g_resources.writeFileContents(getDownloadPath(fileInfo), content)
+      local localPath = getDownloadPath(fileInfo)
+      g_resources.writeFileContents(localPath, content)
+      warn("Scripts T: salvo em " .. localPath)
       index = index + 1
       nextFile()
     end)
@@ -229,7 +242,10 @@ local function refreshList()
           end
           importEntryOtuis(entry)
           loadEntryLua(entry)
+          warn("Scripts T: " .. entry.name .. " ativado com sucesso")
         end)
+      else
+        warn("Scripts T: " .. entry.name .. " desativado")
       end
     end
   end

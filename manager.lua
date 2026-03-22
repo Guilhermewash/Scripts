@@ -1,4 +1,4 @@
-script_bot = script_bot or {}
+script_bot = {}
 
 local tabName = nil
 if ragnarokBot then
@@ -10,35 +10,60 @@ else
 end
 
 local actualVersion = 1
-local storageDir = "/KAIZEN/ScriptsT"
-local storageFile = storageDir .. "/" .. (player and player:getName() or "global") .. ".json"
-local scriptListUrl = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/script_list.lua"
+local script_path = "/KAIZEN/ScriptsT"
+local script_path_json = script_path .. "/" .. (player and player:getName() or "global") .. ".json"
+local script_list_url = "https://raw.githubusercontent.com/Guilhermewash/Scripts/main/script_list.lua"
+local downloads_path = "/Scripts/downloads"
 
-local function ensureStorage()
-  if not g_resources.directoryExists(storageDir) then
-    g_resources.makeDir(storageDir)
+local function ensureDir(path)
+  if not g_resources.directoryExists(path) then
+    g_resources.makeDir(path)
   end
 end
 
 local function saveScripts()
-  local payload = json.encode(script_manager, 2)
-  local ok, err = pcall(function()
-    g_resources.writeFileContents(storageFile, payload)
+  local res = json.encode(script_manager, 2)
+  local status, err = pcall(function()
+    g_resources.writeFileContents(script_path_json, res)
   end)
 
-  if not ok then
+  if not status then
     warn("Scripts T: erro ao salvar state - " .. tostring(err))
   end
+end
+
+local function mergeStates(remoteData, localData)
+  if type(remoteData) ~= "table" or type(remoteData._cache) ~= "table" then
+    return remoteData
+  end
+
+  if type(localData) ~= "table" or type(localData._cache) ~= "table" then
+    return remoteData
+  end
+
+  for categoryName, categoryList in pairs(remoteData._cache) do
+    local localCategory = localData._cache[categoryName]
+    if type(localCategory) == "table" then
+      for scriptName, remoteEntry in pairs(categoryList) do
+        local localEntry = localCategory[scriptName]
+        if type(localEntry) == "table" then
+          remoteEntry.enabled = localEntry.enabled == true
+        end
+      end
+    end
+  end
+
+  return remoteData
 end
 
 local function readScripts()
   local data = script_manager
 
-  if g_resources.fileExists(storageFile) then
-    local content = g_resources.readFileContents(storageFile)
-    local ok, decoded = pcall(json.decode, content)
-    if ok and type(decoded) == "table" then
-      data = decoded
+  if g_resources.fileExists(script_path_json) then
+    local content = g_resources.readFileContents(script_path_json)
+    local status, result = pcall(json.decode, content)
+    if status and type(result) == "table" then
+      data = mergeStates(script_manager, result)
     end
   else
     saveScripts()
@@ -47,115 +72,73 @@ local function readScripts()
   script_manager = data
 end
 
-local function getAllScripts()
-  local list = {}
-
-  for categoryName, categoryList in pairs(script_manager._cache or {}) do
-    for scriptName, scriptData in pairs(categoryList) do
-      table.insert(list, {
-        category = categoryName,
-        name = scriptName,
-        data = scriptData,
-      })
-    end
-  end
-
-  table.sort(list, function(a, b)
-    return a.name:lower() < b.name:lower()
-  end)
-
-  return list
-end
-
 local function getEntryFiles(entry)
-  if type(entry.data.files) == "table" and #entry.data.files > 0 then
-    return entry.data.files
+  if type(entry.files) == "table" and #entry.files > 0 then
+    return entry.files
   end
 
-  return {
-    {
-      path = entry.data.url,
-      type = "lua",
-      localName = entry.data.localName or entry.data.fileName,
+  if entry.url then
+    return {
+      { path = entry.url, type = "lua" }
     }
-  }
-end
-
-local function getDownloadPath(fileInfo)
-  local localName = fileInfo.localName or fileInfo.fileName or fileInfo.name
-  if not localName or localName == "" then
-    localName = fileInfo.path and fileInfo.path:match("/([^/%?]+)$") or "script.lua"
   end
-  return "/Scripts/downloads/" .. localName
+
+  return {}
 end
 
-local function getRemotePath(fileInfo)
-  return fileInfo.path or fileInfo.url or ""
+local function getLocalFilePath(fileInfo)
+  local localName = fileInfo.localName or (fileInfo.path and fileInfo.path:match("/([^/%?]+)$")) or "script.lua"
+  return downloads_path .. "/" .. localName
 end
 
-local function importEntryOtuis(entry)
+local function importOtuis(entry)
   for _, fileInfo in ipairs(getEntryFiles(entry)) do
-    local localPath = getDownloadPath(fileInfo)
-    local fileType = (fileInfo.type or localPath:match("%.([^.]+)$") or ""):lower()
+    local fileType = (fileInfo.type or ""):lower()
+    local localPath = getLocalFilePath(fileInfo)
     if (fileType == "otui" or fileType == "ui") and g_resources.fileExists(localPath) then
-      warn("Scripts T: importando UI " .. localPath)
       g_ui.importStyle(localPath)
     end
   end
 end
 
-local function loadEntryLua(entry)
+local function runLuaFiles(entry)
   for _, fileInfo in ipairs(getEntryFiles(entry)) do
-    local localPath = getDownloadPath(fileInfo)
-    local fileType = (fileInfo.type or localPath:match("%.([^.]+)$") or ""):lower()
+    local fileType = (fileInfo.type or ""):lower()
+    local localPath = getLocalFilePath(fileInfo)
     if fileType == "lua" and g_resources.fileExists(localPath) then
-      warn("Scripts T: carregando script " .. localPath)
-      local script = g_resources.readFileContents(localPath)
-      if script and script ~= "" then
-        assert(loadstring(script, "@" .. localPath))()
+      local content = g_resources.readFileContents(localPath)
+      if content and content ~= "" then
+        assert(loadstring(content, "@" .. localPath))()
       end
     end
   end
 end
 
-local function downloadEntryFiles(entry, callback)
+local function downloadFiles(entry, callback)
   local files = getEntryFiles(entry)
-  local index = 1
+  if #files == 0 then
+    if callback then callback(false, "nenhum arquivo") end
+    return
+  end
 
-  warn("Scripts T: iniciando download de " .. entry.name .. " (" .. #files .. " arquivo(s))")
+  local index = 1
 
   local function nextFile()
     local fileInfo = files[index]
     if not fileInfo then
-      warn("Scripts T: download concluido de " .. entry.name)
-      if callback then
-        callback(true)
-      end
+      if callback then callback(true) end
       return
     end
 
-    local remotePath = getRemotePath(fileInfo)
-    if not remotePath or remotePath == "" then
-      if callback then
-        callback(false, "arquivo remoto vazio")
-      end
-      return
-    end
-
-    warn("Scripts T: baixando [" .. index .. "/" .. #files .. "] " .. remotePath)
-
-    modules.corelib.HTTP.get(remotePath, function(content, err)
+    modules.corelib.HTTP.get(fileInfo.path, function(content, err)
       if err or not content or content == "" then
-        warn("Scripts T: falha em [" .. index .. "/" .. #files .. "] " .. remotePath)
         if callback then
-          callback(false, err or "resposta vazia")
+          callback(false, tostring(err or "resposta vazia"))
         end
         return
       end
 
-      local localPath = getDownloadPath(fileInfo)
-      g_resources.writeFileContents(localPath, content)
-      warn("Scripts T: salvo em " .. localPath)
+      g_resources.writeFileContents(getLocalFilePath(fileInfo), content)
       index = index + 1
       nextFile()
     end)
@@ -164,14 +147,36 @@ local function downloadEntryFiles(entry, callback)
   nextFile()
 end
 
+local function getAllEntries()
+  local entries = {}
+
+  for categoryName, categoryList in pairs(script_manager._cache or {}) do
+    for scriptName, scriptData in pairs(categoryList) do
+      table.insert(entries, {
+        category = categoryName,
+        name = scriptName,
+        data = scriptData,
+      })
+    end
+  end
+
+  table.sort(entries, function(a, b)
+    return a.name:lower() < b.name:lower()
+  end)
+
+  return entries
+end
+
 local function loadEnabledScripts()
-  for _, entry in ipairs(getAllScripts()) do
+  for _, entry in ipairs(getAllEntries()) do
     if entry.data.enabled then
-      downloadEntryFiles(entry, function(success)
-        if success then
-          importEntryOtuis(entry)
-          loadEntryLua(entry)
+      downloadFiles(entry.data, function(success, err)
+        if not success then
+          warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
+          return
         end
+        importOtuis(entry.data)
+        runLuaFiles(entry.data)
       end)
     end
   end
@@ -181,7 +186,7 @@ local rowTemplate = [[
 UIWidget
   background-color: alpha
   focusable: true
-  height: 34
+  height: 30
 
   $focus:
     background-color: #00000055
@@ -189,18 +194,9 @@ UIWidget
   Label
     id: textToSet
     font: terminus-14px-bold
-    anchors.left: parent.left
-    anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    margin-left: 8
+    anchors.horizontalCenter: parent.horizontalCenter
 ]]
-
-local function updateRow(entry, row)
-  row.textToSet:setText(entry.name)
-  row.textToSet:setColor(entry.data.enabled and "green" or "#bdbdbd")
-  row:setTooltip("Descricao: " .. (entry.data.description or "") .. "\nAutor: " .. (entry.data.author or "") .. "\nCategoria: " .. (entry.category or ""))
-  row:setId(entry.name)
-end
 
 local function filterScripts(filterText)
   if not script_bot.widget then
@@ -218,34 +214,30 @@ local function filterScripts(filterText)
   end
 end
 
-local function refreshList()
-  if not script_bot.widget then
-    return
-  end
-
+local function updateScriptList()
   script_bot.widget.scriptList:destroyChildren()
 
-  for _, entry in ipairs(getAllScripts()) do
-    local row = setupUI(rowTemplate, script_bot.widget.scriptList)
-    updateRow(entry, row)
+  for _, entry in ipairs(getAllEntries()) do
+    local label = setupUI(rowTemplate, script_bot.widget.scriptList)
+    label.textToSet:setText(entry.name)
+    label.textToSet:setColor(entry.data.enabled and "green" or "#bdbdbd")
+    label:setTooltip("Description: " .. (entry.data.description or "") .. "\nAuthor: " .. (entry.data.author or ""))
+    label:setId(entry.name)
 
-    row.onClick = function()
+    label.onClick = function()
       entry.data.enabled = not entry.data.enabled
       saveScripts()
-      updateRow(entry, row)
+      label.textToSet:setColor(entry.data.enabled and "green" or "#bdbdbd")
 
       if entry.data.enabled then
-        downloadEntryFiles(entry, function(success, err)
+        downloadFiles(entry.data, function(success, err)
           if not success then
             warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
             return
           end
-          importEntryOtuis(entry)
-          loadEntryLua(entry)
-          warn("Scripts T: " .. entry.name .. " ativado com sucesso")
+          importOtuis(entry.data)
+          runLuaFiles(entry.data)
         end)
-      else
-        warn("Scripts T: " .. entry.name .. " desativado")
       end
     end
   end
@@ -263,20 +255,17 @@ MainWindow
   !text: tr('Scripts T')
   font: terminus-14px-bold
   color: #d2cac5
-  size: 320 400
+  size: 300 400
 
   ScrollablePanel
     id: scriptList
     layout:
       type: verticalBox
-    anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: searchBar.top
+    anchors.fill: parent
     margin-top: 8
     margin-left: 2
     margin-right: 15
-    margin-bottom: 8
+    margin-bottom: 30
     vertical-scrollbar: scriptListScrollBar
 
   VerticalScrollBar
@@ -291,63 +280,61 @@ MainWindow
   TextEdit
     id: searchBar
     anchors.left: parent.left
-    anchors.right: closeButton.left
     anchors.bottom: parent.bottom
-    margin-left: 5
     margin-right: 5
-    margin-bottom: 2
-    height: 21
+    width: 130
 
   Button
     id: closeButton
     !text: tr('Close')
     font: cipsoftFont
     anchors.right: parent.right
+    anchors.left: searchBar.right
     anchors.bottom: parent.bottom
-    size: 55 21
+    size: 45 21
     margin-bottom: 1
     margin-right: 5
+    margin-left: 5
 ]], g_ui.getRootWidget())
 
   script_bot.widget:hide()
   script_bot.widget:setText("Scripts T - " .. actualVersion)
-
-  script_bot.widget.closeButton.onClick = function()
-    script_bot.widget:hide()
-  end
-
-  script_bot.widget.searchBar:setTooltip("Pesquisar macro.")
-  script_bot.widget.searchBar.onTextChange = function(widget, text)
-    filterScripts(text)
-  end
 
   script_bot.buttonWidget = UI.Button("Scripts T", function()
     if script_bot.widget:isVisible() then
       script_bot.widget:hide()
     else
       script_bot.widget:show()
-      script_bot.widget:raise()
-      script_bot.widget:focus()
-      refreshList()
+      updateScriptList()
     end
   end, tabName)
   script_bot.buttonWidget:setColor("#d2cac5")
 
   script_bot.buttonRemoveJson = UI.Button("Reset Scripts T", function()
-    if g_resources.fileExists(storageFile) then
-      g_resources.deleteFile(storageFile)
+    if g_resources.fileExists(script_path_json) then
+      g_resources.deleteFile(script_path_json)
     end
     reload()
   end, tabName)
   script_bot.buttonRemoveJson:setColor("#d2cac5")
-  script_bot.buttonRemoveJson:setTooltip("Limpa o estado salvo do manager.")
+  script_bot.buttonRemoveJson:setTooltip("Click here only when there is an update.")
+
+  script_bot.widget.closeButton.onClick = function()
+    script_bot.widget:hide()
+  end
+
+  script_bot.widget.searchBar:setTooltip("Search macros.")
+  script_bot.widget.searchBar.onTextChange = function(widget, text)
+    filterScripts(text)
+  end
 end
 
-ensureStorage()
+ensureDir(script_path)
+ensureDir(downloads_path)
 
-modules.corelib.HTTP.get(scriptListUrl, function(content, err)
+modules.corelib.HTTP.get(script_list_url, function(content, err)
   if err or not content or content == "" then
-    warn("Scripts T: erro ao baixar script_list.lua")
+    warn("Scripts T: erro ao baixar script_list.lua - " .. tostring(err))
     return
   end
 
@@ -366,10 +353,10 @@ modules.corelib.HTTP.get(scriptListUrl, function(content, err)
 
   readScripts()
   buildWindow()
-  refreshList()
+  updateScriptList()
   loadEnabledScripts()
 
-  if script_manager.actualVersion and script_manager.actualVersion ~= actualVersion then
+  if script_manager.actualVersion ~= actualVersion then
     script_bot.buttonRemoveJson:show()
   else
     script_bot.buttonRemoveJson:hide()

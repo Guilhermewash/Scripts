@@ -5,12 +5,12 @@ script_manager = {
       ["Heal Friend"] = {
         files = {
           {
-            path = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/downloads/friend_heal.otui",
+            path = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/main/downloads/friend_heal.otui",
             type = "otui",
             localName = "friend_heal.otui",
           },
           {
-            path = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/downloads/FriendHeal.lua",
+            path = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/main/downloads/FriendHeal.lua",
             type = "lua",
             localName = "FriendHeal.lua",
           },

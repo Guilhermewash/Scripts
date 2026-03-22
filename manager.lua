@@ -259,8 +259,8 @@ local function updateScriptList()
             warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
             return
           end
-          runLuaFiles(entry.data)
           importOtuis(entry.data)
+          runLuaFiles(entry.data)
         end)
       else
         warn("Scripts T: " .. entry.name .. " desativado")

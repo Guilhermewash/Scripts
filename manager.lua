@@ -96,6 +96,7 @@ local function importOtuis(entry)
     local fileType = (fileInfo.type or ""):lower()
     local localPath = getLocalFilePath(fileInfo)
     if (fileType == "otui" or fileType == "ui") and g_resources.fileExists(localPath) then
+      warn("Scripts T: importando UI -> " .. localPath)
       g_ui.importStyle(localPath)
     end
   end
@@ -106,6 +107,7 @@ local function runLuaFiles(entry)
     local fileType = (fileInfo.type or ""):lower()
     local localPath = getLocalFilePath(fileInfo)
     if fileType == "lua" and g_resources.fileExists(localPath) then
+      warn("Scripts T: executando script -> " .. localPath)
       local content = g_resources.readFileContents(localPath)
       if content and content ~= "" then
         assert(loadstring(content, "@" .. localPath))()
@@ -117,28 +119,35 @@ end
 local function downloadFiles(entry, callback)
   local files = getEntryFiles(entry)
   if #files == 0 then
+    warn("Scripts T: nenhum arquivo configurado para download.")
     if callback then callback(false, "nenhum arquivo") end
     return
   end
 
+  warn("Scripts T: iniciando download de " .. tostring(entry.description or "macro") .. " com " .. #files .. " arquivo(s).")
   local index = 1
 
   local function nextFile()
     local fileInfo = files[index]
     if not fileInfo then
+      warn("Scripts T: download concluido.")
       if callback then callback(true) end
       return
     end
 
+    warn("Scripts T: baixando arquivo " .. index .. "/" .. #files .. " -> " .. tostring(fileInfo.path))
     modules.corelib.HTTP.get(fileInfo.path, function(content, err)
       if err or not content or content == "" then
+        warn("Scripts T: falha ao baixar -> " .. tostring(fileInfo.path) .. " | erro: " .. tostring(err))
         if callback then
           callback(false, tostring(err or "resposta vazia"))
         end
         return
       end
 
-      g_resources.writeFileContents(getLocalFilePath(fileInfo), content)
+      local localPath = getLocalFilePath(fileInfo)
+      g_resources.writeFileContents(localPath, content)
+      warn("Scripts T: arquivo salvo em -> " .. localPath)
       index = index + 1
       nextFile()
     end)
@@ -170,6 +179,7 @@ end
 local function loadEnabledScripts()
   for _, entry in ipairs(getAllEntries()) do
     if entry.data.enabled then
+      warn("Scripts T: autoload de " .. entry.name)
       downloadFiles(entry.data, function(success, err)
         if not success then
           warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
@@ -225,6 +235,7 @@ local function updateScriptList()
     label:setId(entry.name)
 
     label.onClick = function()
+      warn("Scripts T: clique em " .. entry.name)
       entry.data.enabled = not entry.data.enabled
       saveScripts()
       label.textToSet:setColor(entry.data.enabled and "green" or "#bdbdbd")
@@ -238,6 +249,8 @@ local function updateScriptList()
           runLuaFiles(entry.data)
           importOtuis(entry.data)
         end)
+      else
+        warn("Scripts T: " .. entry.name .. " desativado")
       end
     end
   end
@@ -332,6 +345,7 @@ end
 ensureDir(script_path)
 ensureDir(downloads_path)
 
+warn("Scripts T: baixando script_list.lua -> " .. script_list_url)
 modules.corelib.HTTP.get(script_list_url, function(content, err)
   if err or not content or content == "" then
     warn("Scripts T: erro ao baixar script_list.lua - " .. tostring(err))
@@ -351,6 +365,7 @@ modules.corelib.HTTP.get(script_list_url, function(content, err)
     return
   end
 
+  warn("Scripts T: script_list.lua carregado com sucesso")
   readScripts()
   buildWindow()
   updateScriptList()

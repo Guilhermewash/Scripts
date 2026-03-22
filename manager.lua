@@ -175,8 +175,8 @@ local function loadEnabledScripts()
           warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
           return
         end
-        importOtuis(entry.data)
         runLuaFiles(entry.data)
+        importOtuis(entry.data)
       end)
     end
   end
@@ -235,8 +235,8 @@ local function updateScriptList()
             warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
             return
           end
-          importOtuis(entry.data)
           runLuaFiles(entry.data)
+          importOtuis(entry.data)
         end)
       end
     end

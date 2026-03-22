@@ -12,6 +12,7 @@ storage[panelName] = storage[panelName] or {
 
 local cfg = storage[panelName]
 local nextFriendHealAt = 0
+local toggleButton = nil
 
 local function isHealFriend(creature)
   if not creature or not creature:isPlayer() or creature:isLocalPlayer() then
@@ -61,26 +62,6 @@ local function getHealTarget()
   return bestTarget
 end
 
-local ui = setupUI([[
-Panel
-  height: 20
-  BotSwitch
-    id: title
-    anchors.top: parent.top
-    anchors.left: parent.left
-    text-align: center
-    width: 130
-    text: Friend Heal
-  Button
-    id: settings
-    anchors.top: prev.top
-    anchors.left: prev.right
-    anchors.right: parent.right
-    margin-left: 3
-    height: 17
-    text: Setup
-]])
-
 local window = UI.createWindow("FriendHealWindow", g_ui.getRootWidget())
 window:hide()
 window.closeButton.onClick = function()
@@ -128,20 +109,27 @@ window.distancePanel.scroll.onValueChange(window.distancePanel.scroll, window.di
 
 local function syncFriendHealState(isEnabled)
   cfg.enabled = isEnabled
-  ui.title:setOn(isEnabled)
+  if toggleButton then
+    toggleButton:setText(isEnabled and "Friend Heal: ON" or "Friend Heal: OFF")
+    toggleButton:setColor(isEnabled and "green" or "red")
+  end
 end
 
-syncFriendHealState(cfg.enabled == true)
+UI.Separator()
+UI.Label("Friend Heal")
 
-ui.title.onClick = function(widget)
+toggleButton = UI.Button("", function()
   syncFriendHealState(not cfg.enabled)
-end
+end)
 
-ui.settings.onClick = function()
+UI.Button("Friend Heal Setup", function()
   window:show()
   window:raise()
   window:focus()
-end
+end)
+
+syncFriendHealState(cfg.enabled == true)
+UI.Separator()
 
 macro(100, "Friend Heal", function()
   if not cfg.enabled then return end

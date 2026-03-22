@@ -1,4 +1,4 @@
-setDefaultTab("Main")
+setDefaultTab("Tools")
 
 local panelName = "friendHeal"
 storage[panelName] = storage[panelName] or {

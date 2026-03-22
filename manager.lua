@@ -181,13 +181,26 @@ local function loadEnabledScripts()
     if entry.data.enabled then
       warn("Scripts T: autoload de " .. entry.name)
       downloadFiles(entry.data, function(success, err)
-        if not success then
-          warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
-          return
-        end
-        runLuaFiles(entry.data)
-        importOtuis(entry.data)
-      end)
+  warn("Scripts T: callback do download de " .. entry.name .. " | success=" .. tostring(success) .. " | err=" .. tostring(err))
+
+  if not success then
+    warn("Scripts T: falha ao baixar " .. entry.name .. " - " .. tostring(err))
+    return
+  end
+
+  warn("Scripts T: iniciando execucao do lua")
+  local okLua, errLua = pcall(function()
+    runLuaFiles(entry.data)
+  end)
+  warn("Scripts T: fim execucao do lua | ok=" .. tostring(okLua) .. " | err=" .. tostring(errLua))
+
+  warn("Scripts T: iniciando import do otui")
+  local okOtui, errOtui = pcall(function()
+    importOtuis(entry.data)
+  end)
+  warn("Scripts T: fim import do otui | ok=" .. tostring(okOtui) .. " | err=" .. tostring(errOtui))
+end)
+
     end
   end
 end

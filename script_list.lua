@@ -1,0 +1,25 @@
+script_manager = {
+  actualVersion = 1,
+  _cache = {
+    Healing = {
+      ["Heal Friend"] = {
+        files = {
+          {
+            path = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/downloads/friend_heal.otui",
+            type = "otui",
+            localName = "friend_heal.otui",
+          },
+          {
+            path = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/downloads/FriendHeal.lua",
+            type = "lua",
+            localName = "FriendHeal.lua",
+          },
+        },
+        url = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/downloads/FriendHeal.lua",
+        description = "Script para curar os amigos ou membros da party.",
+        author = "mrlthebest",
+        enabled = false,
+      },
+    },
+  },
+}

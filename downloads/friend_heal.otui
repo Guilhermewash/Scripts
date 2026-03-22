@@ -1,0 +1,112 @@
+FriendHealLabeledText < Panel
+  height: 38
+  margin-top: 6
+
+  Label
+    id: label
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+
+  TextEdit
+    id: input
+    anchors.top: label.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    height: 20
+    text-align: center
+
+FriendHealLabeledItem < Panel
+  height: 42
+  margin-top: 6
+
+  Label
+    id: label
+    anchors.left: parent.left
+    anchors.verticalCenter: item.verticalCenter
+    font: verdana-11px-rounded
+
+  BotItem
+    id: item
+    anchors.top: parent.top
+    anchors.right: parent.right
+    size: 32 32
+
+FriendHealLabeledScroll < Panel
+  height: 34
+  margin-top: 6
+
+  Label
+    id: label
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+
+  HorizontalScrollBar
+    id: scroll
+    anchors.top: label.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    minimum: 0
+    maximum: 100
+    step: 1
+
+FriendHealWindow < MainWindow
+  !text: tr('HealFriend')
+  size: 250 280
+  padding: 14
+  @onEscape: self:hide()
+
+  FriendHealLabeledText
+    id: spellPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 24
+
+  FriendHealLabeledItem
+    id: itemPanel
+    anchors.top: spellPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+
+  FriendHealLabeledScroll
+    id: hpPanel
+    anchors.top: itemPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+
+  FriendHealLabeledScroll
+    id: delayPanel
+    anchors.top: hpPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+
+  FriendHealLabeledScroll
+    id: distancePanel
+    anchors.top: delayPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeButton.top
+    margin-bottom: 8
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    font: cipsoftFont
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    size: 45 21
+    margin-right: 5
+    @onClick: self:getParent():hide()

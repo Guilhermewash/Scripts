@@ -15,7 +15,6 @@ script_manager = {
             localName = "FriendHeal.lua",
           },
         },
-        url = "https://raw.githubusercontent.com/Guilhermewash/Scripts/refs/heads/master/downloads/FriendHeal.lua",
         description = "Script para curar os amigos ou membros da party.",
         author = "mrlthebest",
         enabled = false,
